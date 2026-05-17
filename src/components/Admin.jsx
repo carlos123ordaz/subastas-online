@@ -60,6 +60,7 @@ export default function Admin() {
   const [newPName, setNewPName]             = useState('')
   const [addingP, setAddingP]               = useState(false)
   const [winnerModal, setWinnerModal]       = useState(null) // { lotName, lotEmoji, lotImage, winnerName, price }
+  const [imgModal, setImgModal]             = useState(null) // URL de imagen a ampliar
   const [isMobile, setIsMobile]             = useState(() => window.innerWidth < 768)
   const [mobileTab, setMobileTab]           = useState('control')
   const timerRef = useRef(null)
@@ -407,11 +408,15 @@ export default function Admin() {
                 color: 'var(--ms-ink)',
               }}>
                 {/* Thumbnail */}
-                <span style={{
-                  width: 34, height: 34, borderRadius: 8, flexShrink: 0, overflow: 'hidden',
-                  background: 'linear-gradient(135deg,#2d0e6b,#14062a)',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-                }}>
+                <span
+                  onClick={lot.image_url ? e => { e.stopPropagation(); setImgModal(lot.image_url) } : undefined}
+                  style={{
+                    width: 34, height: 34, borderRadius: 8, flexShrink: 0, overflow: 'hidden',
+                    background: 'linear-gradient(135deg,#2d0e6b,#14062a)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                    cursor: lot.image_url ? 'zoom-in' : 'inherit',
+                  }}
+                >
                   {lot.image_url
                     ? <img src={lot.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : lot.emoji}
@@ -568,14 +573,18 @@ export default function Admin() {
               background: 'linear-gradient(135deg,rgba(255,46,136,.08),rgba(42,240,255,.06))',
               position: 'relative', overflow: 'hidden',
             }}>
-              <div style={{
-                width: isMobile ? 56 : 90, height: isMobile ? 56 : 90,
-                borderRadius: isMobile ? 12 : 18, flexShrink: 0, overflow: 'hidden',
-                background: 'linear-gradient(135deg,#ff2e88,#b06bff)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: isMobile ? 28 : 44,
-                boxShadow: '0 8px 24px rgba(255,46,136,.35)',
-              }}>
+              <div
+                onClick={() => activeLot.image_url && setImgModal(activeLot.image_url)}
+                style={{
+                  width: isMobile ? 56 : 90, height: isMobile ? 56 : 90,
+                  borderRadius: isMobile ? 12 : 18, flexShrink: 0, overflow: 'hidden',
+                  background: 'linear-gradient(135deg,#ff2e88,#b06bff)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: isMobile ? 28 : 44,
+                  boxShadow: '0 8px 24px rgba(255,46,136,.35)',
+                  cursor: activeLot.image_url ? 'zoom-in' : 'default',
+                }}
+              >
                 {activeLot.image_url
                   ? <img src={activeLot.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : activeLot.emoji}
@@ -887,6 +896,40 @@ export default function Admin() {
               <span style={{ fontSize: 10, fontFamily: 'var(--ms-font-body)', fontWeight: mobileTab === t.tab ? 700 : 400 }}>{t.label}</span>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Modal imagen ampliada */}
+      {imgModal && (
+        <div
+          onClick={() => setImgModal(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9998,
+            background: 'rgba(0,0,0,.88)', backdropFilter: 'blur(16px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'ms-fadein .2s ease',
+          }}
+        >
+          <img
+            src={imgModal}
+            alt=""
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw', maxHeight: '88vh',
+              borderRadius: 16, objectFit: 'contain',
+              boxShadow: '0 24px 80px rgba(0,0,0,.7)',
+            }}
+          />
+          <button
+            onClick={() => setImgModal(null)}
+            style={{
+              position: 'fixed', top: 16, right: 16,
+              appearance: 'none', border: '1px solid rgba(255,255,255,.2)',
+              borderRadius: '50%', width: 36, height: 36,
+              background: 'rgba(0,0,0,.6)', color: '#fff',
+              fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >✕</button>
         </div>
       )}
 

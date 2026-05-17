@@ -50,6 +50,7 @@ export default function Bidder() {
   const [burstKey, setBurstKey] = useState(0)
   const [placing, setPlacing] = useState(false)
   const [bidError, setBidError] = useState(null)
+  const [imgModal, setImgModal] = useState(null)
   const timerRef = useRef(null)
 
   const topBid = bids[0]
@@ -272,7 +273,11 @@ export default function Bidder() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="ms-photo" style={{ width: 78, height: 78, borderRadius: 16, fontSize: 36, background: 'linear-gradient(135deg,#ff2e88,#b06bff)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div
+              className="ms-photo"
+              onClick={() => lot.image_url && setImgModal(lot.image_url)}
+              style={{ width: 78, height: 78, borderRadius: 16, fontSize: 36, background: 'linear-gradient(135deg,#ff2e88,#b06bff)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: lot.image_url ? 'zoom-in' : 'default' }}
+            >
               {lot.image_url
                 ? <img src={lot.image_url} alt={lot.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : lot.emoji}
@@ -397,6 +402,36 @@ export default function Bidder() {
           </div>
         </div>
       </div>
+
+      {/* Modal imagen ampliada */}
+      {imgModal && (
+        <div
+          onClick={() => setImgModal(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9998,
+            background: 'rgba(0,0,0,.88)', backdropFilter: 'blur(16px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'ms-fadein .2s ease',
+          }}
+        >
+          <img
+            src={imgModal}
+            alt=""
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '90vw', maxHeight: '88vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 24px 80px rgba(0,0,0,.7)' }}
+          />
+          <button
+            onClick={() => setImgModal(null)}
+            style={{
+              position: 'fixed', top: 16, right: 16,
+              appearance: 'none', border: '1px solid rgba(255,255,255,.2)',
+              borderRadius: '50%', width: 36, height: 36,
+              background: 'rgba(0,0,0,.6)', color: '#fff',
+              fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >✕</button>
+        </div>
+      )}
 
       {/* Confetti */}
       {iAmLeader && burstKey > 0 && (

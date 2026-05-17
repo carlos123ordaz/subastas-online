@@ -113,10 +113,12 @@ create policy "lots: lectura publica"      on public.lots for select using (true
 create policy "lots: admin puede escribir" on public.lots for all
   using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
 
--- Bids: lectura pública, insertar si autenticado
+-- Bids: lectura pública, insertar si autenticado, eliminar si admin
 create policy "bids: lectura publica"       on public.bids for select using (true);
 create policy "bids: insertar si logueado"  on public.bids for insert
   with check (auth.uid() = bidder_id and auth.uid() is not null);
+create policy "bids: admin puede eliminar"  on public.bids for delete
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
 
 -- Overlay events: lectura pública, escritura de admin
 create policy "overlay_events: lectura publica"      on public.overlay_events for select using (true);
