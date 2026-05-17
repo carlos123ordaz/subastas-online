@@ -51,8 +51,15 @@ export default function Admin() {
   const [uploadingImg, setUploadingImg] = useState(false)
   const [savingWa, setSavingWa]         = useState(false)
   const [waInput, setWaInput]           = useState('')
-  const [ctxMenu, setCtxMenu]           = useState(null) // { x, y, lotId }
+  const [ctxMenu, setCtxMenu]               = useState(null)
+  const [participants, setParticipants]     = useState([])
+  const [selectedP, setSelectedP]           = useState(null) // participant id
+  const [bidDelta, setBidDelta]             = useState(1)
+  const [placingManual, setPlacingManual]   = useState(false)
+  const [newPName, setNewPName]             = useState('')
+  const [addingP, setAddingP]               = useState(false)
   const timerRef = useRef(null)
+  const newPInputRef = useRef(null)
   const didAutoSelectRef = useRef(false)
 
   const activeLot    = lots.find(l => l.id === activeLotId)
@@ -71,6 +78,15 @@ export default function Admin() {
   useEffect(() => {
     if (auction) setWaInput(auction.whatsapp_number || '')
   }, [auction])
+
+  useEffect(() => {
+    if (!auctionId) return
+    fetchParticipants()
+    const sub = supabase.channel(`admin-participants-${auctionId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants', filter: `auction_id=eq.${auctionId}` }, fetchParticipants)
+      .subscribe()
+    return () => supabase.removeChannel(sub)
+  }, [auctionId])
 
   useEffect(() => {
     if (!auctionId) return
@@ -101,6 +117,29 @@ export default function Admin() {
     timerRef.current = setInterval(() => setSecondsLeft(computeLeft()), 500)
     return () => clearInterval(timerRef.current)
   }, [activeLot])
+
+  async function fetchParticipants() {
+    const { data } = await supabase.from('participants').select('*').eq('auction_id', auctionId).order('created_at')
+    if (data) setParticipants(data)
+  }
+
+  async function addParticipant() {
+    const name = newPName.trim()
+    if (!name) return
+    const { data } = await supabase.from('participants').insert({ auction_id: auctionId, name }).select().single()
+    if (data) {
+      setParticipants(prev => [...prev, data])
+      setSelectedP(data.id)
+    }
+    setNewPName('')
+    setAddingP(false)
+  }
+
+  async function removeParticipant(id) {
+    await supabase.from('participants').delete().eq('id', id)
+    setParticipants(prev => prev.filter(p => p.id !== id))
+    if (selectedP === id) setSelectedP(null)
+  }
 
   async function fetchAuction() {
     const { data } = await supabase.from('auctions').select('*').eq('id', auctionId).single()
@@ -136,7 +175,9 @@ export default function Admin() {
     supabase.from('bids').select('*, profile:profiles(id,name,color,handle)').eq('id', newBid.id).single()
       .then(({ data }) => {
         if (data) setBids(prev => {
-          const filtered = prev.filter(b => b.bidder_id !== data.bidder_id)
+          const filtered = data.bidder_id
+            ? prev.filter(b => b.bidder_id !== data.bidder_id)
+            : prev.filter(b => !(b.bidder_id === null && b.bidder_name === data.bidder_name))
           return [...filtered, data].sort((a, b) => b.amount - a.amount).slice(0, 20)
         })
       })
@@ -179,11 +220,29 @@ export default function Admin() {
     await supabase.from('lots').update({
       status: 'sold', timer_ends_at: null,
       winner_id: winner?.bidder_id ?? null,
+      winner_name: winner?.bidder_name ?? winner?.profile?.name ?? null,
       winning_price: winner?.amount ?? null,
     }).eq('id', activeLotId)
     await sendEffect('sold', '🏆 ¡VENDIDO!')
     beep(660, 0.08); setTimeout(() => beep(880, 0.12), 120); setTimeout(() => beep(1100, 0.16), 240)
   }, [activeLot, activeLotId, bids])
+
+  const placeBidManual = async () => {
+    const p = participants.find(x => x.id === selectedP)
+    if (!p || !activeLot || placingManual || activeLot.status !== 'live') return
+    const newAmount = Math.round((currentPrice + bidDelta) * 100) / 100
+    if (newAmount < 0.5) return
+    setPlacingManual(true)
+    beep(880, 0.08); setTimeout(() => beep(1320, 0.1), 80)
+    await supabase.from('bids').insert({
+      lot_id: activeLotId,
+      bidder_id: null,
+      bidder_name: p.name,
+      amount: newAmount,
+      delta: bidDelta,
+    })
+    setPlacingManual(false)
+  }
 
   const sendEffect = async (type, message = '') => {
     await supabase.from('overlay_events').insert({ lot_id: activeLotId, auction_id: auctionId, type, message: message || null })
@@ -409,6 +468,36 @@ export default function Admin() {
 
         <div className="ms-divider" style={{ margin: '14px 0' }} />
 
+        {/* Participantes (sidebar) */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '0 4px' }}>
+          <span className="ms-eyebrow">PARTICIPANTES ({participants.length})</span>
+          <button onClick={() => { setAddingP(true); setTimeout(() => newPInputRef.current?.focus(), 50) }}
+            style={{ appearance: 'none', border: 'none', background: 'none', color: 'var(--ms-ink-mute)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}>+</button>
+        </div>
+        {participants.length === 0 && (
+          <div style={{ fontSize: 10, color: 'var(--ms-ink-mute)', padding: '0 4px 6px', lineHeight: 1.4 }}>
+            Agrega a los participantes del live antes de iniciar
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 6 }}>
+          {participants.map(p => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,.04)' }}>
+              <span style={{ flex: 1, fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+              <button onClick={() => removeParticipant(p.id)} style={{ appearance: 'none', border: 'none', background: 'none', color: 'var(--ms-ink-mute)', cursor: 'pointer', fontSize: 11, padding: 2, lineHeight: 1 }}>✕</button>
+            </div>
+          ))}
+        </div>
+        {addingP && (
+          <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
+            <input ref={newPInputRef} value={newPName} onChange={e => setNewPName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addParticipant(); if (e.key === 'Escape') { setAddingP(false); setNewPName('') } }}
+              placeholder="Nombre..." className="ms-input" style={{ flex: 1, fontSize: 11 }} autoComplete="off" />
+            <button onClick={addParticipant} style={{ appearance: 'none', border: 0, borderRadius: 7, background: 'var(--ms-magenta)', color: '#fff', cursor: 'pointer', padding: '0 8px', fontSize: 11 }}>OK</button>
+          </div>
+        )}
+
+        <div className="ms-divider" style={{ margin: '14px 0' }} />
+
         {/* WhatsApp de la subasta */}
         <div className="ms-eyebrow" style={{ marginBottom: 8, padding: '0 4px' }}>WHATSAPP DE PAGO</div>
         <div style={{ display: 'flex', gap: 5 }}>
@@ -470,11 +559,122 @@ export default function Admin() {
                 <div style={{ marginTop: 6 }}><LEDPrice value={currentPrice} fontSize={32} /></div>
                 {topBid && (
                   <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', fontSize: 11, color: 'var(--ms-ink-dim)' }}>
-                    <Avatar user={topBid.profile} size={18} /> {topBid.profile?.name || 'Pujador'}
+                    <Avatar user={topBid.profile} size={18} /> {topBid.bidder_name || topBid.profile?.name || 'Pujador'}
                   </div>
                 )}
               </div>
             </div>
+
+            {/* Participants + bid */}
+            {(() => {
+              const selP = participants.find(p => p.id === selectedP)
+              const pBid = (name) => bids.find(b => b.bidder_name === name)?.amount ?? null
+              const isLeader = (name) => bids[0]?.bidder_name === name
+              const nextAmount = Math.round((currentPrice + bidDelta) * 100) / 100
+              return (
+                <div className="ms-card" style={{ padding: 14, marginTop: 12, border: '1px solid rgba(255,46,136,.25)', background: 'linear-gradient(135deg,rgba(255,46,136,.06),transparent)' }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <span className="ms-eyebrow" style={{ color: 'var(--ms-magenta)' }}>PARTICIPANTES ({participants.length})</span>
+                    <button onClick={() => { setAddingP(true); setTimeout(() => newPInputRef.current?.focus(), 50) }}
+                      style={{ appearance: 'none', border: '1px solid rgba(255,255,255,.14)', borderRadius: 7, background: 'rgba(255,255,255,.06)', color: 'var(--ms-ink-dim)', cursor: 'pointer', fontSize: 11, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <IconPlus size={10} /> Agregar
+                    </button>
+                  </div>
+
+                  {/* Add participant input */}
+                  {addingP && (
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                      <input
+                        ref={newPInputRef}
+                        value={newPName}
+                        onChange={e => setNewPName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') addParticipant(); if (e.key === 'Escape') { setAddingP(false); setNewPName('') } }}
+                        placeholder="Nombre del participante..."
+                        className="ms-input"
+                        style={{ flex: 1, fontSize: 12 }}
+                        autoComplete="off"
+                      />
+                      <button onClick={addParticipant} style={{ appearance: 'none', border: 0, cursor: 'pointer', borderRadius: 8, background: 'var(--ms-magenta)', color: '#fff', padding: '0 10px', fontSize: 11 }}>OK</button>
+                      <button onClick={() => { setAddingP(false); setNewPName('') }} style={{ appearance: 'none', border: '1px solid rgba(255,255,255,.12)', cursor: 'pointer', borderRadius: 8, background: 'none', color: 'var(--ms-ink-mute)', padding: '0 8px', fontSize: 11 }}>✕</button>
+                    </div>
+                  )}
+
+                  {/* Participants grid */}
+                  {participants.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 12, color: 'var(--ms-ink-mute)' }}>
+                      Agrega participantes antes de iniciar la subasta
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12, maxHeight: 200, overflowY: 'auto' }}>
+                      {participants.map(p => {
+                        const bid = pBid(p.name)
+                        const leader = isLeader(p.name)
+                        const active = selectedP === p.id
+                        return (
+                          <div key={p.id}
+                            onClick={() => setSelectedP(p.id)}
+                            onContextMenu={e => { e.preventDefault(); removeParticipant(p.id) }}
+                            style={{
+                              padding: '8px 10px', borderRadius: 9, cursor: 'pointer',
+                              border: active ? '1.5px solid var(--ms-magenta)' : leader ? '1px solid rgba(255,210,58,.4)' : '1px solid rgba(255,255,255,.08)',
+                              background: active ? 'rgba(255,46,136,.2)' : leader ? 'rgba(255,210,58,.08)' : 'rgba(255,255,255,.04)',
+                              transition: 'all .1s',
+                            }}
+                          >
+                            <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {leader && <span style={{ color: 'var(--ms-gold)', marginRight: 4 }}>🏆</span>}
+                              {p.name}
+                            </div>
+                            <div className="ms-mono" style={{ fontSize: 11, color: bid ? (leader ? 'var(--ms-gold)' : 'var(--ms-lime)') : 'var(--ms-ink-mute)', marginTop: 2 }}>
+                              {bid != null ? `S/ ${bid}` : 'Sin puja'}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Bid controls */}
+                  {selP && (
+                    <>
+                      <div style={{ fontSize: 11, color: 'var(--ms-ink-dim)', marginBottom: 6 }}>
+                        Pujando por <b style={{ color: 'var(--ms-magenta)' }}>{selP.name}</b>
+                        {pBid(selP.name) != null && <span style={{ color: 'var(--ms-ink-mute)' }}> · actual S/ {pBid(selP.name)}</span>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
+                        {[0.5, 1, 5, 10].map(d => (
+                          <button key={d} onClick={() => setBidDelta(d)} style={{
+                            flex: 1, appearance: 'none', cursor: 'pointer',
+                            fontFamily: 'var(--ms-font-display)', fontSize: 15, padding: '7px 4px', borderRadius: 8,
+                            border: bidDelta === d ? '2px solid var(--ms-magenta)' : '1px solid rgba(255,255,255,.12)',
+                            background: bidDelta === d ? 'rgba(255,46,136,.25)' : 'rgba(255,255,255,.05)',
+                            color: bidDelta === d ? 'var(--ms-magenta)' : 'var(--ms-ink)',
+                          }}>+{d}</button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={placeBidManual}
+                        disabled={!activeLot || activeLot.status !== 'live' || placingManual}
+                        style={{
+                          width: '100%', appearance: 'none', border: 0, cursor: 'pointer',
+                          background: activeLot?.status === 'live' ? 'linear-gradient(180deg,#ff8fc8,#ff2e88)' : 'rgba(255,255,255,.07)',
+                          color: activeLot?.status === 'live' ? '#fff' : 'var(--ms-ink-mute)',
+                          fontFamily: 'var(--ms-font-display)', fontSize: 15, borderRadius: 12, padding: '11px 14px',
+                          boxShadow: activeLot?.status === 'live' ? '0 8px 24px rgba(255,46,136,.4)' : 'none',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        }}
+                      >
+                        {placingManual
+                          ? <span style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'ms-spin .6s linear infinite' }} />
+                          : <><span>{selP.name}</span><span style={{ opacity: .7, fontSize: 13 }}>→</span><span className="ms-mono">S/ {nextAmount}</span></>
+                        }
+                      </button>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Timer + Effects */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12, marginTop: 12 }}>
@@ -566,7 +766,7 @@ export default function Admin() {
                     <div key={f.id || i} style={{ display: 'contents' }}>
                       <Avatar user={f.profile} size={26} />
                       <div>
-                        <div style={{ fontWeight: 600 }}>{f.profile?.name || 'Pujador'}</div>
+                        <div style={{ fontWeight: 600 }}>{f.bidder_name || f.profile?.name || 'Pujador'}</div>
                         <div style={{ fontSize: 10, color: 'var(--ms-ink-mute)' }}>{f.profile?.handle || ''}</div>
                       </div>
                       <span className="ms-mono" style={{ padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11, background: f.delta >= 10 ? 'rgba(255,46,136,.18)' : f.delta >= 5 ? 'rgba(255,210,58,.15)' : 'rgba(200,255,46,.12)', color: f.delta >= 10 ? 'var(--ms-magenta)' : f.delta >= 5 ? 'var(--ms-gold)' : 'var(--ms-lime)' }}>+S/ {f.delta}</span>

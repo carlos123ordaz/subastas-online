@@ -52,7 +52,8 @@ export default function Winner() {
     if (bidsData) {
       setWinnerBid(bidsData[0])
       setTotalBids(bidsData.length)
-      setRivals(new Set(bidsData.map(b => b.bidder_id)).size - 1)
+      const unique = new Set(bidsData.map(b => b.bidder_id ?? b.bidder_name))
+      setRivals(Math.max(0, unique.size - 1))
     }
   }
 
@@ -145,7 +146,7 @@ export default function Winner() {
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             }}>Subasta cerrada</h1>
             <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--ms-ink-dim)', margin: '8px 0 0' }}>
-              El ganador fue <b style={{ color: 'var(--ms-gold)' }}>{winnerBid?.profile?.name || 'otro participante'}</b>
+              El ganador fue <b style={{ color: 'var(--ms-gold)' }}>{winnerBid?.bidder_name || winnerBid?.profile?.name || lot?.winner_name || 'otro participante'}</b>
             </p>
           </>
         )}

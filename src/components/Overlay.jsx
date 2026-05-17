@@ -8,11 +8,12 @@ import ConfettiBurst from './shared/ConfettiBurst'
 import Fireworks from './shared/Fireworks'
 import { IconUsers, IconShare, IconMic } from './shared/Icons'
 
-function FlyingBid({ user, amount, onDone, side = 'right' }) {
+function FlyingBid({ user, name, amount, onDone, side = 'right' }) {
   useEffect(() => {
     const t = setTimeout(onDone, 2400)
     return () => clearTimeout(t)
   }, [])
+  const displayName = name || user?.name || 'Alguien'
   return (
     <div style={{
       position: 'absolute',
@@ -31,7 +32,7 @@ function FlyingBid({ user, amount, onDone, side = 'right' }) {
       }}>
         <Avatar user={user} size={32} />
         <div style={{ lineHeight: 1.1 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, opacity: .9 }}>{user?.name || 'Alguien'}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, opacity: .9 }}>{displayName}</div>
           <div className="ms-mono" style={{ fontSize: 14, fontWeight: 800 }}>+S/ {amount} ↑</div>
         </div>
       </div>
@@ -67,6 +68,7 @@ export default function Overlay() {
 
   const currentPrice = topBids[0]?.amount ?? lot?.start_price ?? 0
   const leader = topBids[0]?.profile
+  const leaderName = topBids[0]?.bidder_name || leader?.name || null
   const danger = secondsLeft <= 10 && secondsLeft > 0
 
   useEffect(() => {
@@ -143,16 +145,18 @@ export default function Overlay() {
     setPulse(k => k + 1)
     idRef.current++
     const bidId = idRef.current
-    setFlyingBids(prev => [...prev.slice(-4), { id: bidId, user: null, amount: newBid.delta, side: bidId % 2 ? 'right' : 'left' }])
+    setFlyingBids(prev => [...prev.slice(-4), { id: bidId, user: null, name: newBid.bidder_name || null, amount: newBid.delta, side: bidId % 2 ? 'right' : 'left' }])
 
     supabase.from('bids').select('*, profile:profiles(id,name,color)').eq('id', newBid.id).single()
       .then(({ data }) => {
         if (data) {
           setTopBids(prev => {
-            const filtered = prev.filter(b => b.bidder_id !== data.bidder_id)
+            const filtered = data.bidder_id
+              ? prev.filter(b => b.bidder_id !== data.bidder_id)
+              : prev.filter(b => !(b.bidder_id === null && b.bidder_name === data.bidder_name))
             return [...filtered, data].sort((a, b) => b.amount - a.amount).slice(0, 5)
           })
-          setFlyingBids(prev => prev.map(f => f.id === bidId ? { ...f, user: data.profile } : f))
+          setFlyingBids(prev => prev.map(f => f.id === bidId ? { ...f, user: data.profile, name: data.bidder_name || null } : f))
         }
       })
   }
@@ -287,7 +291,7 @@ export default function Overlay() {
               }}>
                 <Avatar user={b.profile} size={20} />
                 <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10 }}>
-                  {b.profile?.name || 'Pujador'}
+                  {b.bidder_name || b.profile?.name || 'Pujador'}
                 </div>
                 <span className="ms-mono" style={{ fontSize: 11 }}>S/{b.amount}</span>
               </div>
@@ -326,12 +330,12 @@ export default function Overlay() {
             <div key={pulse} style={{ animation: 'ms-pricepop 0.5s cubic-bezier(.5,1.6,.4,1) both' }}>
               <LEDPrice value={currentPrice} fontSize={40} />
             </div>
-            {leader && (
+            {leaderName && (
               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <div style={{ fontSize: 9, color: 'var(--ms-ink-mute)', letterSpacing: '0.1em' }}>LÍDER</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,46,136,.18)', border: '1px solid rgba(255,46,136,.4)' }}>
                   <Avatar user={leader} size={22} />
-                  <span style={{ fontSize: 12, fontWeight: 700 }}>{leader.name}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700 }}>{leaderName}</span>
                 </div>
               </div>
             )}

@@ -25,7 +25,7 @@ function StepRow({ entry, rank, total, isYou, stepUp }) {
       }}>{rank}</span>
       <Avatar user={entry.profile} size={28} />
       <span style={{ flex: 1, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {entry.profile?.name || 'Usuario'}
+        {entry.bidder_name || entry.profile?.name || 'Usuario'}
         {isYou && <span style={{ color: 'var(--ms-magenta)', marginLeft: 6, fontSize: 10 }}>● TÚ</span>}
       </span>
       <span className="ms-mono" style={{ fontSize: 13, fontWeight: 700, color: rank === 1 ? 'var(--ms-gold)' : 'var(--ms-ink)' }}>
@@ -145,41 +145,36 @@ export default function Bidder() {
     if (data) setBids(data)
   }
 
+  function dedupeFilter(prev, bid) {
+    if (bid.bidder_id) return prev.filter(b => b.bidder_id !== bid.bidder_id)
+    return prev.filter(b => !(b.bidder_id === null && b.bidder_name === bid.bidder_name))
+  }
+
   function handleNewBid(newBid) {
     setBids(prev => {
-      const filtered = prev.filter(b => b.bidder_id !== newBid.bidder_id)
+      const filtered = dedupeFilter(prev, newBid)
       const enriched = [...filtered, newBid].sort((a, b) => b.amount - a.amount)
-      if (newBid.bidder_id !== user?.id) {
-        setShakeKey(k => k + 1)
-        beep(220, 0.18, 'sawtooth', 0.06)
-      }
+      const isExternal = newBid.bidder_id ? newBid.bidder_id !== user?.id : true
+      if (isExternal) { setShakeKey(k => k + 1); beep(220, 0.18, 'sawtooth', 0.06) }
       return enriched.slice(0, 20)
     })
-    // Re-fetch for profile data
     supabase.from('bids').select('*, profile:profiles(id, name, color, handle)').eq('id', newBid.id).single()
       .then(({ data }) => {
         if (data) setBids(prev => {
-          const filtered = prev.filter(b => b.id !== data.id && b.bidder_id !== data.bidder_id)
+          const filtered = dedupeFilter(prev.filter(b => b.id !== data.id), data)
           return [...filtered, data].sort((a, b) => b.amount - a.amount).slice(0, 20)
         })
       })
   }
 
-  const MIN_BID = 0.5
-
   const placeBid = useCallback(async (delta) => {
     if (!user || !lot || placing || lot.status !== 'live') return
-    const newAmount = Math.round((currentPrice + delta) * 100) / 100
-    if (newAmount < MIN_BID) return
     setPlacing(true)
-    if (delta > 0) {
-      beep(880, 0.06, 'square', 0.05)
-      setTimeout(() => beep(1320, 0.08, 'square', 0.05), 80)
-      setStepUpKey(k => k + 1)
-      setBurstKey(k => k + 1)
-    } else {
-      beep(440, 0.06, 'square', 0.04)
-    }
+    const newAmount = currentPrice + delta
+    beep(880, 0.06, 'square', 0.05)
+    setTimeout(() => beep(1320, 0.08, 'square', 0.05), 80)
+    setStepUpKey(k => k + 1)
+    setBurstKey(k => k + 1)
 
     const updates = {}
     if (lot.timer_ends_at) {
@@ -363,7 +358,7 @@ export default function Bidder() {
 
         {/* Bid buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div className="ms-eyebrow">SÚBELE A LA PUJA</div>
+          <div className="ms-eyebrow" style={{ marginBottom: 6 }}>SÚBELE A LA PUJA</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             {[1, 5, 10].map(delta => (
               <button
@@ -377,29 +372,8 @@ export default function Bidder() {
               </button>
             ))}
           </div>
-
-          <div className="ms-eyebrow" style={{ marginTop: 4 }}>BÁJALE A LA PUJA</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            {[0.5, 1, 5].map(delta => {
-              const next = Math.round((currentPrice - delta) * 100) / 100
-              const disabled = placing || lot.status !== 'live' || next < 0.5
-              return (
-                <button
-                  key={delta}
-                  className="ms-btn-bid ms-btn-bid-down"
-                  onClick={() => placeBid(-delta)}
-                  disabled={disabled}
-                  style={{ color: '#04333a' }}
-                >
-                  <div style={{ fontSize: 11, letterSpacing: '0.08em', opacity: .8, fontFamily: 'var(--ms-font-body)', fontWeight: 700 }}>−S/</div>
-                  <div>{delta}</div>
-                </button>
-              )
-            })}
-          </div>
-
-          <div style={{ fontSize: 10.5, color: 'var(--ms-ink-mute)', textAlign: 'center' }}>
-            Puja mínima <b className="ms-mono" style={{ color: 'var(--ms-cyan)' }}>S/ 0.50</b>
+          <div style={{ fontSize: 10.5, color: 'var(--ms-ink-mute)', marginTop: 6, textAlign: 'center' }}>
+            Tu próxima puja sería <b className="ms-mono" style={{ color: 'var(--ms-gold)' }}>S/ {currentPrice + 1}</b> ↑
           </div>
         </div>
 
