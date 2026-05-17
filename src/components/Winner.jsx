@@ -82,7 +82,16 @@ export default function Winner() {
       }} />
 
       <div className="ms-statusbar" style={{ position: 'relative', zIndex: 5 }}>
-        <span>9:43</span>
+        <button
+          onClick={() => navigate('/live')}
+          style={{
+            appearance: 'none', border: 'none', cursor: 'pointer', background: 'none',
+            color: 'var(--ms-ink-dim)', fontFamily: 'var(--ms-font-body)', fontSize: 12,
+            display: 'flex', alignItems: 'center', gap: 5, padding: 0,
+          }}
+        >
+          ‹ Subastas
+        </button>
         <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
           <IconDot size={6} /><IconDot size={6} /><IconDot size={6} />
         </span>
@@ -232,6 +241,12 @@ export default function Winner() {
             Ver próximas subastas
           </button>
         )}
+
+        <button className="ms-btn" style={{ marginTop: isWinner ? 0 : 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13 }}
+          onClick={() => navigate('/live')}
+        >
+          ‹ Volver a subastas
+        </button>
       </div>
     </div>
   )

@@ -240,7 +240,13 @@ export default function Admin() {
 
   const deleteLot = async (id) => {
     await supabase.from('lots').delete().eq('id', id)
-    if (activeLotId === id) setActiveLotId(null)
+    setLots(prev => prev.filter(l => l.id !== id))
+    if (activeLotId === id) { setActiveLotId(null); setBids([]) }
+  }
+
+  const clearBids = async (id) => {
+    await supabase.from('bids').delete().eq('lot_id', id)
+    if (id === activeLotId) setBids([])
   }
 
   const saveWhatsApp = async () => {
@@ -539,7 +545,18 @@ export default function Admin() {
             <div className="ms-card" style={{ padding: 14, marginTop: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <span className="ms-eyebrow">FEED DE PUJAS · TIEMPO REAL</span>
-                <span style={{ fontSize: 10, color: 'var(--ms-ink-mute)' }}>{bids.length} pujas</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 10, color: 'var(--ms-ink-mute)' }}>{bids.length} pujas</span>
+                  {bids.length > 0 && (
+                    <button
+                      onClick={() => clearBids(activeLotId)}
+                      className="ms-btn"
+                      style={{ fontSize: 10, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4, color: '#ff5f5f', borderColor: 'rgba(255,95,95,.3)' }}
+                    >
+                      <IconTrash size={10} /> Limpiar
+                    </button>
+                  )}
+                </div>
               </div>
               {bids.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--ms-ink-mute)', textAlign: 'center', padding: '16px 0' }}>Esperando pujas...</div>
@@ -578,9 +595,23 @@ export default function Admin() {
           <div style={{
             position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 999,
             background: '#1a0a36', border: '1px solid rgba(255,255,255,.14)',
-            borderRadius: 10, padding: 4, minWidth: 160,
+            borderRadius: 10, padding: 4, minWidth: 170,
             boxShadow: '0 8px 32px rgba(0,0,0,.6)',
           }}>
+            <button
+              onClick={() => { clearBids(ctxMenu.lotId); setCtxMenu(null) }}
+              style={{
+                width: '100%', appearance: 'none', border: 'none', cursor: 'pointer',
+                background: 'none', color: 'var(--ms-gold)', fontFamily: 'var(--ms-font-body)',
+                fontSize: 13, padding: '8px 12px', borderRadius: 7, textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,210,58,.12)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              🗑 Limpiar pujas
+            </button>
+            <div style={{ height: 1, background: 'rgba(255,255,255,.08)', margin: '2px 8px' }} />
             <button
               onClick={() => { deleteLot(ctxMenu.lotId); setCtxMenu(null) }}
               style={{

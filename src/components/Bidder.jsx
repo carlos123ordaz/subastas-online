@@ -59,6 +59,11 @@ export default function Bidder() {
   const currentPrice = topBid?.amount ?? lot?.start_price ?? 0
   const danger = secondsLeft <= 10 && secondsLeft > 0
 
+  // Si el lote ya está vendido (ej: al presionar Atrás), redirigir a la pantalla de ganador
+  useEffect(() => {
+    if (lot?.status === 'sold') navigate(`/winner/${lotId}`, { replace: true })
+  }, [lot?.status])
+
   // Fetch initial data
   useEffect(() => {
     if (!lotId) return
@@ -215,7 +220,11 @@ export default function Bidder() {
     </div>
   )
 
-  if (lot.status === 'sold') return null
+  if (lot.status === 'sold') return (
+    <div style={{ minHeight: '100vh', background: 'var(--ms-bg-0)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 36, height: 36, border: '3px solid var(--ms-gold)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'ms-spin 0.7s linear infinite' }} />
+    </div>
+  )
 
   const mins = Math.floor(secondsLeft / 60)
   const secs = secondsLeft % 60
