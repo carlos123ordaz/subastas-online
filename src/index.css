@@ -246,6 +246,8 @@ html, body {
 .ms-btn-bid-1  { background: linear-gradient(180deg, #c8ff7a, #c8ff2e 50%, #92d100); }
 .ms-btn-bid-5  { background: linear-gradient(180deg, #ffe277, #ffd23a 50%, #f5a300); }
 .ms-btn-bid-10 { background: linear-gradient(180deg, #ff8fc8, #ff2e88 50%, #c4006b); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.ms-btn-bid-down { background: linear-gradient(180deg, #5de8ff, #2af0ff 50%, #00b8cc); }
+.ms-btn-bid-down:disabled { opacity: .3; cursor: not-allowed; }
 
 .ms-step {
   display: flex; align-items: center; gap: 10px;

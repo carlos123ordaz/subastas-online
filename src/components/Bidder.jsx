@@ -165,14 +165,21 @@ export default function Bidder() {
       })
   }
 
+  const MIN_BID = 0.5
+
   const placeBid = useCallback(async (delta) => {
     if (!user || !lot || placing || lot.status !== 'live') return
+    const newAmount = Math.round((currentPrice + delta) * 100) / 100
+    if (newAmount < MIN_BID) return
     setPlacing(true)
-    const newAmount = currentPrice + delta
-    beep(880, 0.06, 'square', 0.05)
-    setTimeout(() => beep(1320, 0.08, 'square', 0.05), 80)
-    setStepUpKey(k => k + 1)
-    setBurstKey(k => k + 1)
+    if (delta > 0) {
+      beep(880, 0.06, 'square', 0.05)
+      setTimeout(() => beep(1320, 0.08, 'square', 0.05), 80)
+      setStepUpKey(k => k + 1)
+      setBurstKey(k => k + 1)
+    } else {
+      beep(440, 0.06, 'square', 0.04)
+    }
 
     const updates = {}
     if (lot.timer_ends_at) {
@@ -355,10 +362,10 @@ export default function Bidder() {
         )}
 
         {/* Bid buttons */}
-        <div>
-          <div className="ms-eyebrow" style={{ marginBottom: 6 }}>SÚBELE A LA PUJA</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, position: 'relative' }}>
-            {[1, 5, 10].map((delta, i) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="ms-eyebrow">SÚBELE A LA PUJA</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {[1, 5, 10].map(delta => (
               <button
                 key={delta}
                 className={`ms-btn-bid ms-btn-bid-${delta}`}
@@ -370,8 +377,29 @@ export default function Bidder() {
               </button>
             ))}
           </div>
-          <div style={{ fontSize: 10.5, color: 'var(--ms-ink-mute)', marginTop: 6, textAlign: 'center' }}>
-            Tu próxima puja sería <b className="ms-mono" style={{ color: 'var(--ms-gold)' }}>S/ {currentPrice + 1}</b> ↑
+
+          <div className="ms-eyebrow" style={{ marginTop: 4 }}>BÁJALE A LA PUJA</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {[0.5, 1, 5].map(delta => {
+              const next = Math.round((currentPrice - delta) * 100) / 100
+              const disabled = placing || lot.status !== 'live' || next < 0.5
+              return (
+                <button
+                  key={delta}
+                  className="ms-btn-bid ms-btn-bid-down"
+                  onClick={() => placeBid(-delta)}
+                  disabled={disabled}
+                  style={{ color: '#04333a' }}
+                >
+                  <div style={{ fontSize: 11, letterSpacing: '0.08em', opacity: .8, fontFamily: 'var(--ms-font-body)', fontWeight: 700 }}>−S/</div>
+                  <div>{delta}</div>
+                </button>
+              )
+            })}
+          </div>
+
+          <div style={{ fontSize: 10.5, color: 'var(--ms-ink-mute)', textAlign: 'center' }}>
+            Puja mínima <b className="ms-mono" style={{ color: 'var(--ms-cyan)' }}>S/ 0.50</b>
           </div>
         </div>
 
