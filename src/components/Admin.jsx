@@ -51,6 +51,7 @@ export default function Admin() {
   const [uploadingImg, setUploadingImg] = useState(false)
   const [savingWa, setSavingWa]         = useState(false)
   const [waInput, setWaInput]           = useState('')
+  const [editingWa, setEditingWa]       = useState(false)
   const [ctxMenu, setCtxMenu]               = useState(null)
   const [participants, setParticipants]     = useState([])
   const [selectedP, setSelectedP]           = useState(null) // participant id
@@ -323,6 +324,7 @@ export default function Admin() {
     await supabase.from('auctions').update({ whatsapp_number: waInput.trim() }).eq('id', auctionId)
     await fetchAuction()
     setSavingWa(false)
+    setEditingWa(false)
   }
 
   useEffect(() => {
@@ -366,20 +368,20 @@ export default function Admin() {
             <div className="ms-display" style={{ fontSize: 13, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{auction.title}</div>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10 }}>
           {auction?.status === 'live' && (
             <span className="ms-chip ms-chip-live" style={{ fontSize: 10 }}>
-              <span className="ms-dot" /> EN VIVO · TikTok
+              <span className="ms-dot" />{isMobile ? '' : ' EN VIVO · TikTok'}
             </span>
           )}
-          {activeLotId && (
+          {activeLotId && !isMobile && (
             <a href={overlayUrl} target="_blank" rel="noreferrer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 999, border: '1px solid rgba(42,240,255,.3)', color: 'var(--ms-cyan)', fontSize: 10, textDecoration: 'none', background: 'rgba(42,240,255,.08)' }}>
               <IconLink size={10} /> Overlay
             </a>
           )}
-          <button onClick={signOut} className="ms-btn" style={{ padding: '5px 12px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <IconLogout size={12} /> Salir
+          <button onClick={signOut} className="ms-btn" style={{ padding: isMobile ? '6px 8px' : '5px 12px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <IconLogout size={12} />{!isMobile && ' Salir'}
           </button>
         </div>
       </div>
@@ -499,18 +501,41 @@ export default function Admin() {
         <div className="ms-divider" style={{ margin: '14px 0' }} />
 
         {/* WhatsApp de la subasta */}
-        <div className="ms-eyebrow" style={{ marginBottom: 8, padding: '0 4px' }}>WHATSAPP DE PAGO</div>
-        <div style={{ display: 'flex', gap: 5 }}>
-          <input value={waInput} onChange={e => setWaInput(e.target.value)} placeholder="+51999999999"
-            className="ms-input" style={{ flex: 1, fontSize: 11 }} />
-          <button onClick={saveWhatsApp} disabled={savingWa} className="ms-btn"
-            style={{ padding: '8px 10px', background: '#25d366', borderColor: 'transparent', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center' }}>
-            {savingWa ? '...' : <IconCheck size={12} />}
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, padding: '0 4px' }}>
+          <span className="ms-eyebrow">WHATSAPP DE PAGO</span>
+          {auction?.whatsapp_number && !editingWa && (
+            <button
+              onClick={() => setEditingWa(true)}
+              style={{ appearance: 'none', border: 'none', background: 'none', color: 'var(--ms-ink-mute)', cursor: 'pointer', fontSize: 10, padding: 0, fontFamily: 'var(--ms-font-body)' }}
+            >
+              ✏️ Editar
+            </button>
+          )}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--ms-ink-mute)', marginTop: 5, lineHeight: 1.4 }}>
-          Con código de país. Ej: +51987654321. El ganador verá un botón para contactarte por WhatsApp.
-        </div>
+        {auction?.whatsapp_number && !editingWa ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, background: 'rgba(37,211,102,.08)', border: '1px solid rgba(37,211,102,.25)' }}>
+            <span style={{ fontSize: 16 }}>💬</span>
+            <span className="ms-mono" style={{ fontSize: 12, color: '#25d366', fontWeight: 700, flex: 1 }}>{auction.whatsapp_number}</span>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 5 }}>
+              <input value={waInput} onChange={e => setWaInput(e.target.value)} placeholder="+51999999999"
+                className="ms-input" style={{ flex: 1, fontSize: 11 }} autoFocus={editingWa} />
+              <button onClick={saveWhatsApp} disabled={savingWa} className="ms-btn"
+                style={{ padding: '8px 10px', background: '#25d366', borderColor: 'transparent', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center' }}>
+                {savingWa ? '...' : <IconCheck size={12} />}
+              </button>
+              {editingWa && (
+                <button onClick={() => { setEditingWa(false); setWaInput(auction?.whatsapp_number || '') }} className="ms-btn"
+                  style={{ padding: '8px 8px', fontSize: 11 }}>✕</button>
+              )}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--ms-ink-mute)', marginTop: 5, lineHeight: 1.4 }}>
+              Con código de país. Ej: +51987654321
+            </div>
+          </>
+        )}
 
         <div className="ms-divider" style={{ margin: '14px 0' }} />
 
@@ -539,29 +564,31 @@ export default function Admin() {
           <>
             {/* Now showing */}
             <div className="ms-card" style={{
-              padding: 16, display: 'flex', gap: 16, alignItems: 'center',
+              padding: isMobile ? 10 : 16, display: 'flex', gap: isMobile ? 10 : 16, alignItems: 'center',
               background: 'linear-gradient(135deg,rgba(255,46,136,.08),rgba(42,240,255,.06))',
               position: 'relative', overflow: 'hidden',
             }}>
               <div style={{
-                width: 90, height: 90, borderRadius: 18, flexShrink: 0, overflow: 'hidden',
+                width: isMobile ? 56 : 90, height: isMobile ? 56 : 90,
+                borderRadius: isMobile ? 12 : 18, flexShrink: 0, overflow: 'hidden',
                 background: 'linear-gradient(135deg,#ff2e88,#b06bff)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: isMobile ? 28 : 44,
                 boxShadow: '0 8px 24px rgba(255,46,136,.35)',
               }}>
                 {activeLot.image_url
                   ? <img src={activeLot.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : activeLot.emoji}
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="ms-eyebrow" style={{ color: 'var(--ms-magenta)' }}>LOTE EN VIVO</div>
-                <div className="ms-display" style={{ fontSize: 20, marginTop: 4 }}>{activeLot.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--ms-ink-dim)', marginTop: 2 }}>{activeLot.color_desc} · desde S/{activeLot.start_price}</div>
+                <div className="ms-display" style={{ fontSize: isMobile ? 15 : 20, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeLot.name}</div>
+                {!isMobile && <div style={{ fontSize: 11, color: 'var(--ms-ink-dim)', marginTop: 2 }}>{activeLot.color_desc} · desde S/{activeLot.start_price}</div>}
               </div>
-              <div style={{ textAlign: 'right' }}>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div className="ms-eyebrow">PUJA ACTUAL</div>
-                <div style={{ marginTop: 6 }}><LEDPrice value={currentPrice} fontSize={32} /></div>
-                {topBid && (
+                <div style={{ marginTop: 4 }}><LEDPrice value={currentPrice} fontSize={isMobile ? 24 : 32} /></div>
+                {topBid && !isMobile && (
                   <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', fontSize: 11, color: 'var(--ms-ink-dim)' }}>
                     <Avatar user={topBid.profile} size={18} /> {topBid.bidder_name || topBid.profile?.name || 'Pujador'}
                   </div>
