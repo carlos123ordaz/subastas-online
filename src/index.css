@@ -112,6 +112,10 @@ html, body {
   0%,100%{background-position:0% 50%}
   50%{background-position:100% 50%}
 }
+@keyframes ms-coin-drop {
+  0%{transform:translateY(0) rotate(0deg);opacity:1}
+  100%{transform:translateY(110vh) rotate(720deg);opacity:.7}
+}
 @keyframes ms-fly {
   0%{transform:translateY(80px) scale(0.4);opacity:0}
   15%{transform:translateY(0) scale(1.05);opacity:1}

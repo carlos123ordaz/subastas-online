@@ -376,10 +376,16 @@ export default function Admin() {
             </span>
           )}
           {activeLotId && !isMobile && (
-            <a href={overlayUrl} target="_blank" rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 999, border: '1px solid rgba(42,240,255,.3)', color: 'var(--ms-cyan)', fontSize: 10, textDecoration: 'none', background: 'rgba(42,240,255,.08)' }}>
-              <IconLink size={10} /> Overlay
-            </a>
+            <>
+              <a href={overlayUrl} target="_blank" rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 999, border: '1px solid rgba(42,240,255,.3)', color: 'var(--ms-cyan)', fontSize: 10, textDecoration: 'none', background: 'rgba(42,240,255,.08)' }}>
+                <IconLink size={10} /> Overlay
+              </a>
+              <a href={`${window.location.origin}/monitor/${activeLotId}`} target="_blank" rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 999, border: '1px solid rgba(255,210,58,.3)', color: 'var(--ms-gold)', fontSize: 10, textDecoration: 'none', background: 'rgba(255,210,58,.08)' }}>
+                <IconLink size={10} /> Monitor
+              </a>
+            </>
           )}
           <button onClick={signOut} className="ms-btn" style={{ padding: isMobile ? '6px 8px' : '5px 12px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}>
             <IconLogout size={12} />{!isMobile && ' Salir'}

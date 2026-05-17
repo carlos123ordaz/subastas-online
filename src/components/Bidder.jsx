@@ -58,7 +58,8 @@ export default function Bidder() {
   const iAmLeader = topBid?.bidder_id === user?.id
   const wasOutbid = myBid && !iAmLeader
   const currentPrice = topBid?.amount ?? lot?.start_price ?? 0
-  const danger = secondsLeft <= 10 && secondsLeft > 0
+  const danger    = secondsLeft <= 10 && secondsLeft > 0
+  const timedOut  = lot?.status === 'live' && secondsLeft === 0
 
   // Si el lote ya está vendido (ej: al presionar Atrás), redirigir a la pantalla de ganador
   useEffect(() => {
@@ -169,7 +170,7 @@ export default function Bidder() {
   }
 
   const placeBid = useCallback(async (delta) => {
-    if (!user || !lot || placing || lot.status !== 'live') return
+    if (!user || !lot || placing || lot.status !== 'live' || secondsLeft === 0) return
     setPlacing(true)
     const newAmount = currentPrice + delta
     beep(880, 0.06, 'square', 0.05)
@@ -197,7 +198,7 @@ export default function Bidder() {
       setTimeout(() => setBidError(null), 3000)
     }
     setPlacing(false)
-  }, [user, lot, placing, currentPrice, lotId])
+  }, [user, lot, placing, currentPrice, lotId, secondsLeft])
 
   if (!lot) return (
     <div style={{ minHeight: '100vh', background: 'var(--ms-bg-0)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -318,7 +319,18 @@ export default function Bidder() {
 
         {/* Status banner */}
         <div style={{ margin: '12px 0', textAlign: 'center', minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {wasOutbid ? (
+          {timedOut ? (
+            <div style={{
+              padding: '8px 14px', borderRadius: 999,
+              background: 'linear-gradient(90deg,rgba(255,210,58,.18),rgba(255,210,58,.06))',
+              border: '1px solid rgba(255,210,58,.5)',
+              fontSize: 12, fontWeight: 700, color: 'var(--ms-gold)',
+              display: 'flex', alignItems: 'center', gap: 6,
+              animation: 'ms-pulse 1.4s ease-in-out infinite',
+            }}>
+              ⏱ Tiempo agotado · Esperando al admin...
+            </div>
+          ) : wasOutbid ? (
             <div style={{
               padding: '8px 14px', borderRadius: 999,
               background: 'linear-gradient(90deg,rgba(255,46,136,.25),rgba(255,46,136,.1))',
@@ -364,21 +376,37 @@ export default function Bidder() {
         {/* Bid buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="ms-eyebrow" style={{ marginBottom: 6 }}>SÚBELE A LA PUJA</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            {[1, 5, 10].map(delta => (
-              <button
-                key={delta}
-                className={`ms-btn-bid ms-btn-bid-${delta}`}
-                onClick={() => placeBid(delta)}
-                disabled={placing || lot.status !== 'live'}
-              >
-                <div style={{ fontSize: 11, letterSpacing: '0.08em', opacity: .8, fontFamily: 'var(--ms-font-body)', fontWeight: 700 }}>+S/</div>
-                <div>{delta}</div>
-              </button>
-            ))}
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, opacity: timedOut ? 0.35 : 1, transition: 'opacity .3s' }}>
+              {[1, 5, 10].map(delta => (
+                <button
+                  key={delta}
+                  className={`ms-btn-bid ms-btn-bid-${delta}`}
+                  onClick={() => placeBid(delta)}
+                  disabled={placing || lot.status !== 'live' || timedOut}
+                >
+                  <div style={{ fontSize: 11, letterSpacing: '0.08em', opacity: .8, fontFamily: 'var(--ms-font-body)', fontWeight: 700 }}>+S/</div>
+                  <div>{delta}</div>
+                </button>
+              ))}
+            </div>
+            {timedOut && (
+              <div style={{
+                position: 'absolute', inset: 0, borderRadius: 18,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(8,1,15,.55)', backdropFilter: 'blur(2px)',
+                fontSize: 12, fontWeight: 700, color: 'var(--ms-gold)',
+                gap: 6,
+              }}>
+                🔒 Pujas bloqueadas
+              </div>
+            )}
           </div>
-          <div style={{ fontSize: 10.5, color: 'var(--ms-ink-mute)', marginTop: 6, textAlign: 'center' }}>
-            Tu próxima puja sería <b className="ms-mono" style={{ color: 'var(--ms-gold)' }}>S/ {currentPrice + 1}</b> ↑
+          <div style={{ fontSize: 10.5, color: timedOut ? 'var(--ms-gold)' : 'var(--ms-ink-mute)', marginTop: 6, textAlign: 'center', transition: 'color .3s' }}>
+            {timedOut
+              ? 'El admin puede añadir más tiempo para continuar'
+              : <>Tu próxima puja sería <b className="ms-mono" style={{ color: 'var(--ms-gold)' }}>S/ {currentPrice + 1}</b> ↑</>
+            }
           </div>
         </div>
 

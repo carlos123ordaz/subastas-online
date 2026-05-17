@@ -7,6 +7,7 @@ import Overlay from './components/Overlay'
 import Admin from './components/Admin'
 import AdminDashboard from './components/AdminDashboard'
 import AuctionList from './components/AuctionList'
+import Monitor from './components/Monitor'
 
 function Spinner() {
   return (
@@ -45,6 +46,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login"              element={<Login />} />
       <Route path="/overlay/:lotId"     element={<Overlay />} />
+      <Route path="/monitor/:lotId"     element={<Monitor />} />
       <Route path="/"                   element={<RootRedirect />} />
       <Route path="/live"               element={<ProtectedRoute><AuctionList /></ProtectedRoute>} />
       <Route path="/live/:lotId"        element={<ProtectedRoute><Bidder /></ProtectedRoute>} />
