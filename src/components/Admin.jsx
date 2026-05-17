@@ -58,6 +58,9 @@ export default function Admin() {
   const [placingManual, setPlacingManual]   = useState(false)
   const [newPName, setNewPName]             = useState('')
   const [addingP, setAddingP]               = useState(false)
+  const [winnerModal, setWinnerModal]       = useState(null) // { lotName, lotEmoji, lotImage, winnerName, price }
+  const [isMobile, setIsMobile]             = useState(() => window.innerWidth < 768)
+  const [mobileTab, setMobileTab]           = useState('control')
   const timerRef = useRef(null)
   const newPInputRef = useRef(null)
   const didAutoSelectRef = useRef(false)
@@ -225,6 +228,13 @@ export default function Admin() {
     }).eq('id', activeLotId)
     await sendEffect('sold', '🏆 ¡VENDIDO!')
     beep(660, 0.08); setTimeout(() => beep(880, 0.12), 120); setTimeout(() => beep(1100, 0.16), 240)
+    setWinnerModal({
+      lotName:   activeLot.name,
+      lotEmoji:  activeLot.emoji,
+      lotImage:  activeLot.image_url ?? null,
+      winnerName: winner?.bidder_name ?? winner?.profile?.name ?? null,
+      price:     winner?.amount ?? null,
+    })
   }, [activeLot, activeLotId, bids])
 
   const placeBidManual = async () => {
@@ -315,6 +325,12 @@ export default function Admin() {
     setSavingWa(false)
   }
 
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   const isRunning    = activeLot?.status === 'live' && !!activeLot?.timer_ends_at
   const totalRevenue = lots.filter(l => l.status === 'sold').reduce((sum, l) => sum + (l.winning_price || 0), 0)
   const overlayUrl   = `${window.location.origin}/overlay/${activeLotId}`
@@ -323,23 +339,32 @@ export default function Admin() {
     <div className="ms-root" style={{
       width: '100vw', height: '100vh',
       background: 'linear-gradient(180deg,#0a0218,#08010f)',
-      display: 'grid', gridTemplateColumns: '260px 1fr 320px', gridTemplateRows: '48px 1fr',
+      ...(isMobile
+        ? { display: 'flex', flexDirection: 'column' }
+        : { display: 'grid', gridTemplateColumns: '260px 1fr 320px', gridTemplateRows: '48px 1fr' }
+      ),
       fontSize: 13, overflow: 'hidden',
     }}>
       {/* Top bar */}
       <div style={{
-        gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,.08)',
+        ...(isMobile ? { flexShrink: 0 } : { gridColumn: '1 / -1' }),
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        height: 48, padding: '0 12px', borderBottom: '1px solid rgba(255,255,255,.08)',
         background: 'rgba(8,1,15,.7)', backdropFilter: 'blur(20px)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--ms-grad-gold)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-            <MichiFace size={22} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ width: 28, height: 28, borderRadius: 9, background: 'var(--ms-grad-gold)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <MichiFace size={20} />
           </span>
-          <div style={{ lineHeight: 1.05 }}>
-            <div className="ms-display" style={{ fontSize: 15 }}>MichiStore <span style={{ color: 'var(--ms-magenta)' }}>· Studio</span></div>
-            <div className="ms-mono" style={{ fontSize: 9, color: 'var(--ms-ink-dim)', letterSpacing: '0.16em' }}>ADMIN CONSOLE</div>
-          </div>
+          {!isMobile && (
+            <div style={{ lineHeight: 1.05 }}>
+              <div className="ms-display" style={{ fontSize: 15 }}>MichiStore <span style={{ color: 'var(--ms-magenta)' }}>· Studio</span></div>
+              <div className="ms-mono" style={{ fontSize: 9, color: 'var(--ms-ink-dim)', letterSpacing: '0.16em' }}>ADMIN CONSOLE</div>
+            </div>
+          )}
+          {isMobile && auction?.title && (
+            <div className="ms-display" style={{ fontSize: 13, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{auction.title}</div>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {auction?.status === 'live' && (
@@ -360,7 +385,12 @@ export default function Admin() {
       </div>
 
       {/* Left: lots queue */}
-      <div style={{ padding: '14px 10px', borderRight: '1px solid rgba(255,255,255,.06)', background: 'rgba(255,255,255,.02)', overflowY: 'auto' }}>
+      <div style={{
+        padding: '14px 10px',
+        borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,.06)',
+        background: 'rgba(255,255,255,.02)', overflowY: 'auto',
+        ...(isMobile ? { display: mobileTab === 'lotes' ? 'block' : 'none', flex: 1 } : {}),
+      }}>
         <div className="ms-eyebrow" style={{ marginBottom: 8, padding: '0 4px' }}>LOTES ({lots.length})</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {lots.map((lot) => (
@@ -468,36 +498,6 @@ export default function Admin() {
 
         <div className="ms-divider" style={{ margin: '14px 0' }} />
 
-        {/* Participantes (sidebar) */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '0 4px' }}>
-          <span className="ms-eyebrow">PARTICIPANTES ({participants.length})</span>
-          <button onClick={() => { setAddingP(true); setTimeout(() => newPInputRef.current?.focus(), 50) }}
-            style={{ appearance: 'none', border: 'none', background: 'none', color: 'var(--ms-ink-mute)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}>+</button>
-        </div>
-        {participants.length === 0 && (
-          <div style={{ fontSize: 10, color: 'var(--ms-ink-mute)', padding: '0 4px 6px', lineHeight: 1.4 }}>
-            Agrega a los participantes del live antes de iniciar
-          </div>
-        )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 6 }}>
-          {participants.map(p => (
-            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,.04)' }}>
-              <span style={{ flex: 1, fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-              <button onClick={() => removeParticipant(p.id)} style={{ appearance: 'none', border: 'none', background: 'none', color: 'var(--ms-ink-mute)', cursor: 'pointer', fontSize: 11, padding: 2, lineHeight: 1 }}>✕</button>
-            </div>
-          ))}
-        </div>
-        {addingP && (
-          <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
-            <input ref={newPInputRef} value={newPName} onChange={e => setNewPName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addParticipant(); if (e.key === 'Escape') { setAddingP(false); setNewPName('') } }}
-              placeholder="Nombre..." className="ms-input" style={{ flex: 1, fontSize: 11 }} autoComplete="off" />
-            <button onClick={addParticipant} style={{ appearance: 'none', border: 0, borderRadius: 7, background: 'var(--ms-magenta)', color: '#fff', cursor: 'pointer', padding: '0 8px', fontSize: 11 }}>OK</button>
-          </div>
-        )}
-
-        <div className="ms-divider" style={{ margin: '14px 0' }} />
-
         {/* WhatsApp de la subasta */}
         <div className="ms-eyebrow" style={{ marginBottom: 8, padding: '0 4px' }}>WHATSAPP DE PAGO</div>
         <div style={{ display: 'flex', gap: 5 }}>
@@ -530,7 +530,11 @@ export default function Admin() {
       </div>
 
       {/* Center: controls */}
-      <div style={{ padding: '16px 20px', overflowY: 'auto' }}>
+      <div style={{
+        padding: isMobile ? '12px' : '16px 20px',
+        overflowY: 'auto',
+        ...(isMobile ? { display: mobileTab === 'control' ? 'block' : 'none', flex: 1 } : {}),
+      }}>
         {activeLot ? (
           <>
             {/* Now showing */}
@@ -565,119 +569,8 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Participants + bid */}
-            {(() => {
-              const selP = participants.find(p => p.id === selectedP)
-              const pBid = (name) => bids.find(b => b.bidder_name === name)?.amount ?? null
-              const isLeader = (name) => bids[0]?.bidder_name === name
-              const nextAmount = Math.round((currentPrice + bidDelta) * 100) / 100
-              return (
-                <div className="ms-card" style={{ padding: 14, marginTop: 12, border: '1px solid rgba(255,46,136,.25)', background: 'linear-gradient(135deg,rgba(255,46,136,.06),transparent)' }}>
-                  {/* Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <span className="ms-eyebrow" style={{ color: 'var(--ms-magenta)' }}>PARTICIPANTES ({participants.length})</span>
-                    <button onClick={() => { setAddingP(true); setTimeout(() => newPInputRef.current?.focus(), 50) }}
-                      style={{ appearance: 'none', border: '1px solid rgba(255,255,255,.14)', borderRadius: 7, background: 'rgba(255,255,255,.06)', color: 'var(--ms-ink-dim)', cursor: 'pointer', fontSize: 11, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <IconPlus size={10} /> Agregar
-                    </button>
-                  </div>
-
-                  {/* Add participant input */}
-                  {addingP && (
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                      <input
-                        ref={newPInputRef}
-                        value={newPName}
-                        onChange={e => setNewPName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') addParticipant(); if (e.key === 'Escape') { setAddingP(false); setNewPName('') } }}
-                        placeholder="Nombre del participante..."
-                        className="ms-input"
-                        style={{ flex: 1, fontSize: 12 }}
-                        autoComplete="off"
-                      />
-                      <button onClick={addParticipant} style={{ appearance: 'none', border: 0, cursor: 'pointer', borderRadius: 8, background: 'var(--ms-magenta)', color: '#fff', padding: '0 10px', fontSize: 11 }}>OK</button>
-                      <button onClick={() => { setAddingP(false); setNewPName('') }} style={{ appearance: 'none', border: '1px solid rgba(255,255,255,.12)', cursor: 'pointer', borderRadius: 8, background: 'none', color: 'var(--ms-ink-mute)', padding: '0 8px', fontSize: 11 }}>✕</button>
-                    </div>
-                  )}
-
-                  {/* Participants grid */}
-                  {participants.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 12, color: 'var(--ms-ink-mute)' }}>
-                      Agrega participantes antes de iniciar la subasta
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12, maxHeight: 200, overflowY: 'auto' }}>
-                      {participants.map(p => {
-                        const bid = pBid(p.name)
-                        const leader = isLeader(p.name)
-                        const active = selectedP === p.id
-                        return (
-                          <div key={p.id}
-                            onClick={() => setSelectedP(p.id)}
-                            onContextMenu={e => { e.preventDefault(); removeParticipant(p.id) }}
-                            style={{
-                              padding: '8px 10px', borderRadius: 9, cursor: 'pointer',
-                              border: active ? '1.5px solid var(--ms-magenta)' : leader ? '1px solid rgba(255,210,58,.4)' : '1px solid rgba(255,255,255,.08)',
-                              background: active ? 'rgba(255,46,136,.2)' : leader ? 'rgba(255,210,58,.08)' : 'rgba(255,255,255,.04)',
-                              transition: 'all .1s',
-                            }}
-                          >
-                            <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {leader && <span style={{ color: 'var(--ms-gold)', marginRight: 4 }}>🏆</span>}
-                              {p.name}
-                            </div>
-                            <div className="ms-mono" style={{ fontSize: 11, color: bid ? (leader ? 'var(--ms-gold)' : 'var(--ms-lime)') : 'var(--ms-ink-mute)', marginTop: 2 }}>
-                              {bid != null ? `S/ ${bid}` : 'Sin puja'}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {/* Bid controls */}
-                  {selP && (
-                    <>
-                      <div style={{ fontSize: 11, color: 'var(--ms-ink-dim)', marginBottom: 6 }}>
-                        Pujando por <b style={{ color: 'var(--ms-magenta)' }}>{selP.name}</b>
-                        {pBid(selP.name) != null && <span style={{ color: 'var(--ms-ink-mute)' }}> · actual S/ {pBid(selP.name)}</span>}
-                      </div>
-                      <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
-                        {[0.5, 1, 5, 10].map(d => (
-                          <button key={d} onClick={() => setBidDelta(d)} style={{
-                            flex: 1, appearance: 'none', cursor: 'pointer',
-                            fontFamily: 'var(--ms-font-display)', fontSize: 15, padding: '7px 4px', borderRadius: 8,
-                            border: bidDelta === d ? '2px solid var(--ms-magenta)' : '1px solid rgba(255,255,255,.12)',
-                            background: bidDelta === d ? 'rgba(255,46,136,.25)' : 'rgba(255,255,255,.05)',
-                            color: bidDelta === d ? 'var(--ms-magenta)' : 'var(--ms-ink)',
-                          }}>+{d}</button>
-                        ))}
-                      </div>
-                      <button
-                        onClick={placeBidManual}
-                        disabled={!activeLot || activeLot.status !== 'live' || placingManual}
-                        style={{
-                          width: '100%', appearance: 'none', border: 0, cursor: 'pointer',
-                          background: activeLot?.status === 'live' ? 'linear-gradient(180deg,#ff8fc8,#ff2e88)' : 'rgba(255,255,255,.07)',
-                          color: activeLot?.status === 'live' ? '#fff' : 'var(--ms-ink-mute)',
-                          fontFamily: 'var(--ms-font-display)', fontSize: 15, borderRadius: 12, padding: '11px 14px',
-                          boxShadow: activeLot?.status === 'live' ? '0 8px 24px rgba(255,46,136,.4)' : 'none',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        }}
-                      >
-                        {placingManual
-                          ? <span style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'ms-spin .6s linear infinite' }} />
-                          : <><span>{selP.name}</span><span style={{ opacity: .7, fontSize: 13 }}>→</span><span className="ms-mono">S/ {nextAmount}</span></>
-                        }
-                      </button>
-                    </>
-                  )}
-                </div>
-              )
-            })()}
-
             {/* Timer + Effects */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12, marginTop: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr', gap: 12, marginTop: 12 }}>
               <div className="ms-card" style={{ padding: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <span className="ms-eyebrow">CRONÓMETRO</span>
@@ -829,67 +722,214 @@ export default function Admin() {
         </>
       )}
 
-      {/* Right: preview */}
-      <div style={{ borderLeft: '1px solid rgba(255,255,255,.06)', padding: '14px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
-        <div className="ms-eyebrow">PREVIEW OVERLAY</div>
-        <div style={{ aspectRatio: '9/16', width: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)', position: 'relative', background: 'linear-gradient(180deg,#14062a,#08010f)' }}>
-          <div style={{ position: 'absolute', inset: 0, padding: 8, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span className="ms-chip ms-chip-live" style={{ fontSize: 7, padding: '2px 6px' }}>
-                <span className="ms-dot" style={{ width: 4, height: 4 }} /> LIVE
-              </span>
-            </div>
-            <div style={{ flex: 1, borderRadius: 8, background: 'radial-gradient(circle at 50% 40%, rgba(255,46,136,.4), transparent 65%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34 }}>🎙️</div>
-            {activeLot && (
-              <div style={{ marginTop: 6, padding: 8, borderRadius: 10, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(6px)' }}>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 6, overflow: 'hidden', background: 'linear-gradient(135deg,#ff2e88,#b06bff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
-                    {activeLot.image_url ? <img src={activeLot.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : activeLot.emoji}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 8, color: 'var(--ms-magenta)', letterSpacing: '0.1em' }}>SUBASTANDO</div>
-                    <div style={{ fontSize: 9, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeLot.name}</div>
-                  </div>
-                </div>
-                <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span className="ms-mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--ms-gold)' }}>S/ {currentPrice}</span>
-                  <span className="ms-mono" style={{ fontSize: 11, color: danger ? 'var(--ms-magenta)' : 'var(--ms-cyan)' }}>
-                    {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-                  </span>
-                </div>
+      {/* Right: participants */}
+      <div style={{
+        borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,.06)',
+        padding: '14px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto',
+        ...(isMobile ? { display: mobileTab === 'participantes' ? 'flex' : 'none', flex: 1 } : {}),
+      }}>
+        {(() => {
+          const selP = participants.find(p => p.id === selectedP)
+          const pBid = (name) => bids.find(b => b.bidder_name === name)?.amount ?? null
+          const isLeader = (name) => bids[0]?.bidder_name === name
+          const nextAmount = Math.round((currentPrice + bidDelta) * 100) / 100
+          return (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span className="ms-eyebrow" style={{ color: 'var(--ms-magenta)' }}>PARTICIPANTES ({participants.length})</span>
+                <button onClick={() => { setAddingP(true); setTimeout(() => newPInputRef.current?.focus(), 50) }}
+                  style={{ appearance: 'none', border: '1px solid rgba(255,255,255,.14)', borderRadius: 7, background: 'rgba(255,255,255,.06)', color: 'var(--ms-ink-dim)', cursor: 'pointer', fontSize: 11, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <IconPlus size={10} /> Agregar
+                </button>
               </div>
-            )}
-          </div>
-        </div>
 
-        {activeLotId && (
-          <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(42,240,255,.06)', border: '1px solid rgba(42,240,255,.2)', fontSize: 11 }}>
-            <div className="ms-eyebrow" style={{ color: 'var(--ms-cyan)', marginBottom: 6 }}>URL PARA OBS</div>
-            <div className="ms-mono" style={{ fontSize: 10, wordBreak: 'break-all', color: 'var(--ms-ink-dim)', marginBottom: 8 }}>{overlayUrl}</div>
-            <button className="ms-btn" style={{ width: '100%', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-              onClick={() => navigator.clipboard?.writeText(overlayUrl)}>
-              <IconLink size={11} /> Copiar URL overlay
-            </button>
-          </div>
-        )}
+              {addingP && (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    ref={newPInputRef}
+                    value={newPName}
+                    onChange={e => setNewPName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addParticipant(); if (e.key === 'Escape') { setAddingP(false); setNewPName('') } }}
+                    placeholder="Nombre del participante..."
+                    className="ms-input"
+                    style={{ flex: 1, fontSize: 12 }}
+                    autoComplete="off"
+                  />
+                  <button onClick={addParticipant} style={{ appearance: 'none', border: 0, cursor: 'pointer', borderRadius: 8, background: 'var(--ms-magenta)', color: '#fff', padding: '0 10px', fontSize: 11 }}>OK</button>
+                  <button onClick={() => { setAddingP(false); setNewPName('') }} style={{ appearance: 'none', border: '1px solid rgba(255,255,255,.12)', cursor: 'pointer', borderRadius: 8, background: 'none', color: 'var(--ms-ink-mute)', padding: '0 8px', fontSize: 11 }}>✕</button>
+                </div>
+              )}
 
-        <div className="ms-divider" />
-        <div className="ms-eyebrow">CHAT LIVE (DEMO)</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, flex: 1, overflow: 'hidden' }}>
+              {participants.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 12, color: 'var(--ms-ink-mute)' }}>
+                  Agrega participantes antes de iniciar la subasta
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, flex: 1, overflowY: 'auto' }}>
+                  {participants.map(p => {
+                    const bid = pBid(p.name)
+                    const leader = isLeader(p.name)
+                    const active = selectedP === p.id
+                    return (
+                      <div key={p.id}
+                        onClick={() => setSelectedP(p.id)}
+                        onContextMenu={e => { e.preventDefault(); removeParticipant(p.id) }}
+                        style={{
+                          padding: '8px 10px', borderRadius: 9, cursor: 'pointer',
+                          border: active ? '1.5px solid var(--ms-magenta)' : leader ? '1px solid rgba(255,210,58,.4)' : '1px solid rgba(255,255,255,.08)',
+                          background: active ? 'rgba(255,46,136,.2)' : leader ? 'rgba(255,210,58,.08)' : 'rgba(255,255,255,.04)',
+                          transition: 'all .1s',
+                        }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {leader && <span style={{ color: 'var(--ms-gold)', marginRight: 4 }}>🏆</span>}
+                          {p.name}
+                        </div>
+                        <div className="ms-mono" style={{ fontSize: 11, color: bid ? (leader ? 'var(--ms-gold)' : 'var(--ms-lime)') : 'var(--ms-ink-mute)', marginTop: 2 }}>
+                          {bid != null ? `S/ ${bid}` : 'Sin puja'}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {selP && (
+                <>
+                  <div className="ms-divider" />
+                  <div style={{ fontSize: 11, color: 'var(--ms-ink-dim)' }}>
+                    Pujando por <b style={{ color: 'var(--ms-magenta)' }}>{selP.name}</b>
+                    {pBid(selP.name) != null && <span style={{ color: 'var(--ms-ink-mute)' }}> · actual S/ {pBid(selP.name)}</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {[0.5, 1, 5, 10].map(d => (
+                      <button key={d} onClick={() => setBidDelta(d)} style={{
+                        flex: 1, appearance: 'none', cursor: 'pointer',
+                        fontFamily: 'var(--ms-font-display)', fontSize: 15, padding: '7px 4px', borderRadius: 8,
+                        border: bidDelta === d ? '2px solid var(--ms-magenta)' : '1px solid rgba(255,255,255,.12)',
+                        background: bidDelta === d ? 'rgba(255,46,136,.25)' : 'rgba(255,255,255,.05)',
+                        color: bidDelta === d ? 'var(--ms-magenta)' : 'var(--ms-ink)',
+                      }}>+{d}</button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={placeBidManual}
+                    disabled={!activeLot || activeLot.status !== 'live' || placingManual}
+                    style={{
+                      width: '100%', appearance: 'none', border: 0, cursor: 'pointer',
+                      background: activeLot?.status === 'live' ? 'linear-gradient(180deg,#ff8fc8,#ff2e88)' : 'rgba(255,255,255,.07)',
+                      color: activeLot?.status === 'live' ? '#fff' : 'var(--ms-ink-mute)',
+                      fontFamily: 'var(--ms-font-display)', fontSize: 15, borderRadius: 12, padding: '11px 14px',
+                      boxShadow: activeLot?.status === 'live' ? '0 8px 24px rgba(255,46,136,.4)' : 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    {placingManual
+                      ? <span style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'ms-spin .6s linear infinite' }} />
+                      : <><span>{selP.name}</span><span style={{ opacity: .7, fontSize: 13 }}>→</span><span className="ms-mono">S/ {nextAmount}</span></>
+                    }
+                  </button>
+                </>
+              )}
+            </>
+          )
+        })()}
+      </div>
+
+      {/* Mobile tab bar */}
+      {isMobile && (
+        <div style={{
+          flexShrink: 0, display: 'flex',
+          background: 'rgba(8,1,15,.96)', borderTop: '1px solid rgba(255,255,255,.1)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}>
           {[
-            { n: '@vale.cl', c: '#ffd23a', t: 'ese hoodie es mío 🔥' },
-            { n: '@diego.07', c: '#2af0ff', t: 'subo +5 oblígame' },
-            { n: '@mateo_og', c: '#c8ff2e', t: '¿hay envío a Trujillo?' },
-            { n: '@paolape', c: '#ff5fb3', t: 'AAA QUE PAJA 😻' },
-            { n: '@kshkun', c: '#ff7a3a', t: 'cierra el lote ya jajaj' },
-          ].map((c, i) => (
-            <div key={i} style={{ padding: '4px 8px', borderRadius: 8, background: 'rgba(255,255,255,.03)' }}>
-              <span style={{ color: c.c, fontWeight: 700 }}>{c.n}</span>{' '}
-              <span style={{ color: 'var(--ms-ink-dim)' }}>{c.t}</span>
-            </div>
+            { tab: 'lotes',         label: 'Lotes',       icon: '📋' },
+            { tab: 'control',       label: 'Control',     icon: '⚡' },
+            { tab: 'participantes', label: 'Participantes', icon: '👥' },
+          ].map(t => (
+            <button key={t.tab} onClick={() => setMobileTab(t.tab)} style={{
+              flex: 1, appearance: 'none', border: 'none', cursor: 'pointer',
+              background: 'none', padding: '8px 4px 6px',
+              borderTop: mobileTab === t.tab ? '2px solid var(--ms-magenta)' : '2px solid transparent',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              color: mobileTab === t.tab ? 'var(--ms-magenta)' : 'var(--ms-ink-mute)',
+              transition: 'color .15s',
+            }}>
+              <span style={{ fontSize: 20 }}>{t.icon}</span>
+              <span style={{ fontSize: 10, fontFamily: 'var(--ms-font-body)', fontWeight: mobileTab === t.tab ? 700 : 400 }}>{t.label}</span>
+            </button>
           ))}
         </div>
-      </div>
+      )}
+
+      {/* Modal ganador */}
+      {winnerModal && (
+        <div
+          onClick={() => setWinnerModal(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(8,1,15,.85)', backdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'ms-fadein .25s ease',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(160deg,#1a0535,#0a0218)',
+              border: '1px solid rgba(255,210,58,.35)',
+              borderRadius: 24, padding: '36px 40px', maxWidth: 420, width: '90%',
+              boxShadow: '0 0 60px rgba(255,210,58,.18), 0 24px 64px rgba(0,0,0,.6)',
+              textAlign: 'center', position: 'relative',
+            }}
+          >
+            {/* Imagen / emoji del lote */}
+            <div style={{
+              width: 100, height: 100, borderRadius: 22, overflow: 'hidden',
+              background: 'linear-gradient(135deg,#ff2e88,#b06bff)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 54, margin: '0 auto 20px',
+              boxShadow: '0 12px 32px rgba(255,46,136,.4)',
+            }}>
+              {winnerModal.lotImage
+                ? <img src={winnerModal.lotImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : winnerModal.lotEmoji}
+            </div>
+
+            <div className="ms-eyebrow" style={{ color: 'var(--ms-gold)', letterSpacing: '0.18em', marginBottom: 6 }}>
+              🏆 LOTE CERRADO
+            </div>
+            <div className="ms-display" style={{ fontSize: 22, marginBottom: 4 }}>{winnerModal.lotName}</div>
+
+            <div style={{ margin: '20px 0', padding: '16px', borderRadius: 14, background: 'rgba(255,210,58,.08)', border: '1px solid rgba(255,210,58,.2)' }}>
+              <div className="ms-eyebrow" style={{ color: 'var(--ms-ink-dim)', marginBottom: 8 }}>GANADOR</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ms-gold)' }}>
+                {winnerModal.winnerName ?? '—'}
+              </div>
+              {winnerModal.price != null && (
+                <div className="ms-mono" style={{ fontSize: 32, fontWeight: 700, color: '#fff', marginTop: 8 }}>
+                  S/ {winnerModal.price}
+                </div>
+              )}
+            </div>
+
+            {!winnerModal.winnerName && (
+              <div style={{ fontSize: 12, color: 'var(--ms-ink-mute)', marginBottom: 16 }}>
+                No hubo pujas en este lote.
+              </div>
+            )}
+
+            <button
+              onClick={() => setWinnerModal(null)}
+              className="ms-btn"
+              style={{ width: '100%', padding: '11px', fontSize: 13, marginTop: 4, background: 'var(--ms-gold)', borderColor: 'transparent', color: '#08010f', fontWeight: 700 }}
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
