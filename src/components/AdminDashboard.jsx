@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import MichiFace from './shared/MichiFace'
-import { IconPlus, IconPlay, IconLogout, IconHammer } from './shared/Icons'
+import { IconPlus, IconPlay, IconLogout, IconHammer, IconTrash } from './shared/Icons'
 
 export default function AdminDashboard() {
   const { profile, signOut } = useAuth()
@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const [auctions, setAuctions] = useState([])
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [ctxMenu, setCtxMenu] = useState(null) // { x, y, auctionId }
 
   useEffect(() => {
     fetchAuctions()
@@ -22,6 +23,11 @@ export default function AdminDashboard() {
       .select('*, lots(count)')
       .order('created_at', { ascending: false })
     if (data) setAuctions(data)
+  }
+
+  async function deleteAuction(id) {
+    await supabase.from('auctions').delete().eq('id', id)
+    fetchAuctions()
   }
 
   async function createAuction() {
@@ -115,7 +121,9 @@ export default function AdminDashboard() {
               <p>No hay subastas aún. ¡Crea la primera!</p>
             </div>
           ) : auctions.map(a => (
-            <div key={a.id} className="ms-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div key={a.id} className="ms-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}
+              onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, auctionId: a.id }) }}
+            >
               <div style={{
                 width: 44, height: 44, borderRadius: 12,
                 background: a.status === 'live' ? 'linear-gradient(135deg,#ff2e88,#b06bff)' : 'rgba(255,255,255,.08)',
@@ -149,6 +157,33 @@ export default function AdminDashboard() {
           ))}
         </div>
       </div>
+
+      {/* Context menu subastas */}
+      {ctxMenu && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setCtxMenu(null)} onContextMenu={e => { e.preventDefault(); setCtxMenu(null) }} />
+          <div style={{
+            position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 999,
+            background: '#1a0a36', border: '1px solid rgba(255,255,255,.14)',
+            borderRadius: 10, padding: 4, minWidth: 180,
+            boxShadow: '0 8px 32px rgba(0,0,0,.6)',
+          }}>
+            <button
+              onClick={() => { deleteAuction(ctxMenu.auctionId); setCtxMenu(null) }}
+              style={{
+                width: '100%', appearance: 'none', border: 'none', cursor: 'pointer',
+                background: 'none', color: '#ff5f5f', fontFamily: 'var(--ms-font-body)',
+                fontSize: 13, padding: '8px 12px', borderRadius: 7, textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,95,95,.15)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <IconTrash size={13} /> Eliminar subasta
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -7,7 +7,7 @@ import MichiFace from './shared/MichiFace'
 import LEDPrice from './shared/LEDPrice'
 import ConfettiBurst from './shared/ConfettiBurst'
 import Fireworks from './shared/Fireworks'
-import { IconCheck, IconShare, IconDot } from './shared/Icons'
+import { IconShare, IconDot } from './shared/Icons'
 
 export default function Winner() {
   const { lotId } = useParams()
@@ -189,7 +189,7 @@ export default function Winner() {
         {/* CTAs */}
         {isWinner && (
           <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {whatsappNumber ? (
+            {whatsappNumber && (
               <a
                 href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(
                   `¡Hola! Gané el lote "${lot.name}" por S/ ${winnerBid?.amount} en MichiStore Live 🏆\n` +
@@ -213,15 +213,6 @@ export default function Winner() {
                 </svg>
                 PAGAR · S/ {winnerBid?.amount ?? 0}
               </a>
-            ) : (
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)',
-                borderRadius: 16, padding: '14px 18px',
-                fontSize: 13, color: 'var(--ms-ink-dim)',
-              }}>
-                <IconCheck size={16} /> Contacta al vendedor para coordinar el pago
-              </div>
             )}
             <button className="ms-btn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', fontSize: 13 }}
               onClick={() => navigator.share?.({ title: '¡Gané en MichiStore!', text: `Gané el ${lot.name} por S/ ${winnerBid?.amount}` })}

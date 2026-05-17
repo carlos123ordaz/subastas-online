@@ -51,6 +51,7 @@ export default function Admin() {
   const [uploadingImg, setUploadingImg] = useState(false)
   const [savingWa, setSavingWa]         = useState(false)
   const [waInput, setWaInput]           = useState('')
+  const [ctxMenu, setCtxMenu]           = useState(null) // { x, y, lotId }
   const timerRef = useRef(null)
   const didAutoSelectRef = useRef(false)
 
@@ -237,7 +238,10 @@ export default function Admin() {
     setUploadingImg(false)
   }
 
-  const deleteLot = async (id) => { await supabase.from('lots').delete().eq('id', id) }
+  const deleteLot = async (id) => {
+    await supabase.from('lots').delete().eq('id', id)
+    if (activeLotId === id) setActiveLotId(null)
+  }
 
   const saveWhatsApp = async () => {
     setSavingWa(true)
@@ -295,7 +299,9 @@ export default function Admin() {
         <div className="ms-eyebrow" style={{ marginBottom: 8, padding: '0 4px' }}>LOTES ({lots.length})</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {lots.map((lot) => (
-            <div key={lot.id} style={{ position: 'relative' }}>
+            <div key={lot.id} style={{ position: 'relative' }}
+              onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, lotId: lot.id }) }}
+            >
               <button onClick={() => setActiveLotId(lot.id)} style={{
                 width: '100%', appearance: 'none', cursor: 'pointer', textAlign: 'left',
                 display: 'flex', alignItems: 'center', gap: 8, padding: '8px 8px', borderRadius: 10,
@@ -564,6 +570,33 @@ export default function Admin() {
           </div>
         )}
       </div>
+
+      {/* Context menu lotes */}
+      {ctxMenu && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setCtxMenu(null)} onContextMenu={e => { e.preventDefault(); setCtxMenu(null) }} />
+          <div style={{
+            position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 999,
+            background: '#1a0a36', border: '1px solid rgba(255,255,255,.14)',
+            borderRadius: 10, padding: 4, minWidth: 160,
+            boxShadow: '0 8px 32px rgba(0,0,0,.6)',
+          }}>
+            <button
+              onClick={() => { deleteLot(ctxMenu.lotId); setCtxMenu(null) }}
+              style={{
+                width: '100%', appearance: 'none', border: 'none', cursor: 'pointer',
+                background: 'none', color: '#ff5f5f', fontFamily: 'var(--ms-font-body)',
+                fontSize: 13, padding: '8px 12px', borderRadius: 7, textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,95,95,.15)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <IconTrash size={13} /> Eliminar lote
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Right: preview */}
       <div style={{ borderLeft: '1px solid rgba(255,255,255,.06)', padding: '14px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
