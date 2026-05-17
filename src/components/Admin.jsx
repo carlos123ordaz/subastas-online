@@ -52,6 +52,7 @@ export default function Admin() {
   const [savingWa, setSavingWa]         = useState(false)
   const [waInput, setWaInput]           = useState('')
   const timerRef = useRef(null)
+  const didAutoSelectRef = useRef(false)
 
   const activeLot    = lots.find(l => l.id === activeLotId)
   const topBid       = bids[0]
@@ -109,7 +110,13 @@ export default function Admin() {
     const { data } = await supabase.from('lots').select('*').eq('auction_id', auctionId).order('order_num')
     if (data) {
       setLots(data)
-      if (!activeLotId && data.length > 0) setActiveLotId(data[0].id)
+      if (!didAutoSelectRef.current && data.length > 0) {
+        didAutoSelectRef.current = true
+        const preferred = data.find(l => l.status === 'live')
+          ?? data.find(l => l.status === 'pending')
+          ?? data[0]
+        setActiveLotId(preferred.id)
+      }
     }
   }
 

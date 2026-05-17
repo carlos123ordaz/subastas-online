@@ -49,6 +49,7 @@ export default function Bidder() {
   const [stepUpKey, setStepUpKey] = useState(0)
   const [burstKey, setBurstKey] = useState(0)
   const [placing, setPlacing] = useState(false)
+  const [bidError, setBidError] = useState(null)
   const timerRef = useRef(null)
 
   const topBid = bids[0]
@@ -107,6 +108,21 @@ export default function Bidder() {
       .subscribe()
 
     return () => { supabase.removeChannel(lotSub); supabase.removeChannel(bidSub) }
+  }, [lotId, user?.id])
+
+  // Viewers en tiempo real via Presence
+  useEffect(() => {
+    if (!lotId) return
+    const ch = supabase.channel(`presence-lot-${lotId}`)
+      .on('presence', { event: 'sync' }, () => {
+        setViewers(Object.keys(ch.presenceState()).length)
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await ch.track({ uid: user?.id ?? 'guest', at: Date.now() })
+        }
+      })
+    return () => supabase.removeChannel(ch)
   }, [lotId, user?.id])
 
   async function fetchLot() {
@@ -168,7 +184,10 @@ export default function Bidder() {
       supabase.from('bids').insert({ lot_id: lotId, bidder_id: user.id, amount: newAmount, delta }),
       Object.keys(updates).length ? supabase.from('lots').update(updates).eq('id', lotId) : Promise.resolve(),
     ])
-    if (error) console.error('Bid error:', error)
+    if (error) {
+      setBidError('No se pudo registrar la puja. Intenta de nuevo.')
+      setTimeout(() => setBidError(null), 3000)
+    }
     setPlacing(false)
   }, [user, lot, placing, currentPrice, lotId])
 
@@ -224,6 +243,11 @@ export default function Bidder() {
           <span className="ms-chip ms-chip-live" style={{ fontSize: 9.5, padding: '3px 8px' }}>
             <span className="ms-dot" style={{ width: 5, height: 5 }} /> EN VIVO
           </span>
+          {viewers > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9.5, color: 'var(--ms-ink-dim)' }}>
+              <IconUsers size={10} /> {viewers}
+            </span>
+          )}
         </div>
       </div>
 
@@ -308,6 +332,18 @@ export default function Bidder() {
             </div>
           )}
         </div>
+
+        {/* Error toast */}
+        {bidError && (
+          <div style={{
+            margin: '0 0 8px', padding: '10px 14px', borderRadius: 12,
+            background: 'linear-gradient(90deg,rgba(255,46,136,.22),rgba(255,46,136,.08))',
+            border: '1px solid var(--ms-magenta)',
+            fontSize: 12, fontWeight: 700, color: 'var(--ms-magenta)', textAlign: 'center',
+          }}>
+            ⚠️ {bidError}
+          </div>
+        )}
 
         {/* Bid buttons */}
         <div>
