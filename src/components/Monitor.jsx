@@ -118,6 +118,22 @@ export default function Monitor() {
   if (lot?.status === 'live')       phase = secondsLeft <= 10 ? 'closing' : 'live'
   else if (lot?.status === 'sold')  phase = 'sold'
 
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen()
+    } else {
+      document.exitFullscreen()
+    }
+  }
+
   const today = new Date()
   const dateStr = `${today.getDate()}/${today.getMonth() + 1}`
   const mins = Math.floor(secondsLeft / 60)
@@ -138,6 +154,15 @@ export default function Monitor() {
 
     return () => { supabase.removeChannel(lotSub); supabase.removeChannel(bidSub) }
   }, [lotId])
+
+  useEffect(() => {
+    if (lot?.status === 'pending') {
+      setTopBids([])
+      setRecentBids([])
+      setPulseKey(0)
+      setCoinKey(0)
+    }
+  }, [lot?.status])
 
   useEffect(() => {
     clearInterval(timerRef.current)
@@ -294,6 +319,8 @@ export default function Monitor() {
             </div>
           </div>
         </div>
+
+        <FullscreenBtn isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
 
         {/* Bottom ticker */}
         <div style={{ position: 'absolute', bottom: 32, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 20, padding: '0 48px' }}>
@@ -494,6 +521,8 @@ export default function Monitor() {
           </div>
         </div>
 
+        <FullscreenBtn isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+
         {coinKey > 0 && <CoinShower trigger={coinKey} />}
 
         {veryDanger && (
@@ -585,6 +614,58 @@ export default function Monitor() {
           Siguiente lote en breve...
         </div>
       </div>
+
+      <FullscreenBtn isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
     </div>
+  )
+}
+
+function FullscreenBtn({ isFullscreen, onToggle }) {
+  const [visible, setVisible] = useState(true)
+  const hideTimer = useRef(null)
+
+  const show = () => {
+    setVisible(true)
+    clearTimeout(hideTimer.current)
+    hideTimer.current = setTimeout(() => setVisible(false), 2500)
+  }
+
+  useEffect(() => {
+    hideTimer.current = setTimeout(() => setVisible(false), 2500)
+    window.addEventListener('mousemove', show)
+    return () => {
+      clearTimeout(hideTimer.current)
+      window.removeEventListener('mousemove', show)
+    }
+  }, [])
+
+  return (
+    <button
+      onClick={onToggle}
+      title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+      style={{
+        position: 'fixed', bottom: 20, right: 20, zIndex: 9999,
+        width: 44, height: 44, borderRadius: 12,
+        background: 'rgba(8,1,15,.75)', backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,.15)',
+        color: 'rgba(255,255,255,.7)', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        opacity: visible ? 1 : 0,
+        transition: 'opacity .4s ease, background .15s',
+        pointerEvents: visible ? 'auto' : 'none',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,46,136,.35)'; e.currentTarget.style.color = '#fff' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(8,1,15,.75)'; e.currentTarget.style.color = 'rgba(255,255,255,.7)' }}
+    >
+      {isFullscreen ? (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>
+        </svg>
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>
+        </svg>
+      )}
+    </button>
   )
 }

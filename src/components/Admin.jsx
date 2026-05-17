@@ -61,6 +61,7 @@ export default function Admin() {
   const [addingP, setAddingP]               = useState(false)
   const [winnerModal, setWinnerModal]       = useState(null) // { lotName, lotEmoji, lotImage, winnerName, price }
   const [imgModal, setImgModal]             = useState(null) // URL de imagen a ampliar
+  const [resetModal, setResetModal]         = useState(null) // lotId a reiniciar
   const [isMobile, setIsMobile]             = useState(() => window.innerWidth < 768)
   const [mobileTab, setMobileTab]           = useState('control')
   const timerRef = useRef(null)
@@ -318,6 +319,23 @@ export default function Admin() {
   const clearBids = async (id) => {
     await supabase.from('bids').delete().eq('lot_id', id)
     if (id === activeLotId) setBids([])
+  }
+
+  const resetLot = async () => {
+    const lot = lots.find(l => l.id === resetModal)
+    if (!lot) return
+    await supabase.from('bids').delete().eq('lot_id', lot.id)
+    await supabase.from('lots').update({
+      status: 'pending',
+      timer_ends_at: null,
+      timer_remaining: lot.timer_duration ?? 60,
+      winner_id: null,
+      winner_name: null,
+      winning_price: null,
+    }).eq('id', lot.id)
+    if (lot.id === activeLotId) setBids([])
+    setResetModal(null)
+    beep(330, 0.1)
   }
 
   const saveWhatsApp = async () => {
@@ -652,6 +670,13 @@ export default function Admin() {
                 <div style={{ marginTop: 10, padding: '7px 10px', borderRadius: 10, background: 'rgba(200,255,46,.06)', border: '1px dashed rgba(200,255,46,.3)', fontSize: 11, color: 'var(--ms-lime)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <IconBolt size={11} /> Anti-sniping ON: puja en últimos 5s suma +10s.
                 </div>
+                <button
+                  className="ms-btn"
+                  style={{ marginTop: 8, width: '100%', fontSize: 11, padding: '7px', color: '#ff9966', borderColor: 'rgba(255,153,102,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                  onClick={() => setResetModal(activeLotId)}
+                >
+                  ↺ Reiniciar subasta
+                </button>
               </div>
 
               <div className="ms-card" style={{ padding: 14 }}>
@@ -936,6 +961,57 @@ export default function Admin() {
               fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >✕</button>
+        </div>
+      )}
+
+      {/* Modal reinicio */}
+      {resetModal && (
+        <div
+          onClick={() => setResetModal(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(8,1,15,.85)', backdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'ms-fadein .2s ease',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(160deg,#1a0535,#0a0218)',
+              border: '1px solid rgba(255,153,102,.35)',
+              borderRadius: 24, padding: '32px 36px', maxWidth: 400, width: '90%',
+              boxShadow: '0 0 60px rgba(255,153,102,.15), 0 24px 64px rgba(0,0,0,.6)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 12 }}>↺</div>
+            <div className="ms-display" style={{ fontSize: 20, marginBottom: 8 }}>
+              Reiniciar subasta
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--ms-ink-dim)', lineHeight: 1.5, marginBottom: 24 }}>
+              Esto borrará <b style={{ color: '#ff9966' }}>todas las pujas</b> del lote
+              <b style={{ color: 'var(--ms-ink)' }}> "{lots.find(l => l.id === resetModal)?.name}"</b> y
+              lo volverá a estado <b style={{ color: 'var(--ms-cyan)' }}>pendiente</b>.
+              El monitor mostrará la pantalla de inicio.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setResetModal(null)}
+                className="ms-btn"
+                style={{ flex: 1, padding: '11px', fontSize: 13 }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={resetLot}
+                className="ms-btn"
+                style={{ flex: 1, padding: '11px', fontSize: 13, background: 'rgba(255,153,102,.2)', borderColor: 'rgba(255,153,102,.5)', color: '#ff9966', fontWeight: 700 }}
+              >
+                Sí, reiniciar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
